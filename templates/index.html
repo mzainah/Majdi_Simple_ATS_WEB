@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced ATS Resume Analyzer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-center mb-8">Advanced ATS Resume Analyzer</h1>
+        
+        <!-- Error Display Section -->
+        <div id="errorDisplay" class="hidden mb-8 bg-red-50 border border-red-200 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-red-800 mb-2">Error Details:</h3>
+            <div id="errorMessage" class="text-red-700 font-mono whitespace-pre-wrap"></div>
+            <button onclick="copyError()" class="mt-4 px-4 py-2 bg-red-100 text-red-800 rounded hover:bg-red-200">
+                Copy Error
+            </button>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <form id="uploadForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Upload Resume (Text file)</label>
+                    <input type="file" name="resume" accept=".txt" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Upload Job Description (Text file)</label>
+                    <input type="file" name="jobdesc" accept=".txt" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                    Analyze Resume
+                </button>
+            </form>
+        </div>
+        
+        <div id="results" class="bg-white rounded-lg shadow-lg p-6 hidden">
+            <h2 class="text-2xl font-bold mb-6">Analysis Results</h2>
+            
+            <div class="space-y-8">
+                <!-- Overall Score -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">Overall Match Score</h3>
+                    <div id="overallScore" class="text-4xl font-bold text-blue-600">0%</div>
+                </div>
+
+                <!-- Detailed Scores -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-md font-semibold mb-2">Content Similarity</h3>
+                        <div id="similarityScore" class="text-2xl font-bold text-green-600">0%</div>
+                    </div>
+                    <div>
+                        <h3 class="text-md font-semibold mb-2">Technical Skills Match</h3>
+                        <div id="techSkillsScore" class="text-2xl font-bold text-green-600">0%</div>
+                    </div>
+                    <div>
+                        <h3 class="text-md font-semibold mb-2">Keyword Match</h3>
+                        <div id="keywordScore" class="text-2xl font-bold text-green-600">0%</div>
+                    </div>
+                    <div>
+                        <h3 class="text-md font-semibold mb-2">Experience Match</h3>
+                        <div id="experienceScore" class="text-2xl font-bold text-green-600">0%</div>
+                    </div>
+                    <div>
+                        <h3 class="text-md font-semibold mb-2">Education Match</h3>
+                        <div id="educationScore" class="text-2xl font-bold text-green-600">0%</div>
+                    </div>
+                </div>
+
+                <!-- Technical Skills -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">Technical Skills</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-600 mb-2">Matching Skills</h4>
+                            <div id="matchingTechSkills" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-600 mb-2">Missing Skills</h4>
+                            <div id="missingTechSkills" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Keywords -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">Keywords Analysis</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-600 mb-2">Matching Keywords</h4>
+                            <div id="matchingKeywords" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-600 mb-2">Missing Keywords</h4>
+                            <div id="missingKeywords" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showError(error) {
+            const errorDisplay = document.getElementById('errorDisplay');
+            const errorMessage = document.getElementById('errorMessage');
+            const results = document.getElementById('results');
+            
+            results.classList.add('hidden');
+            errorDisplay.classList.remove('hidden');
+            errorMessage.textContent = typeof error === 'string' ? error : 
+                                     error.stack || error.message || JSON.stringify(error, null, 2);
+        }
+
+        function copyError() {
+            const errorMessage = document.getElementById('errorMessage').textContent;
+            navigator.clipboard.writeText(errorMessage)
+                .then(() => alert('Error copied to clipboard!'))
+                .catch(err => console.error('Failed to copy:', err));
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            document.getElementById('errorDisplay').classList.add('hidden');
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || data.traceback || 'Unknown error occurred');
+                }
+            } catch (error) {
+                showError(error);
+            }
+        });
+
+        function displayResults(data) {
+            // Show results section
+            const results = document.getElementById('results');
+            results.classList.remove('hidden');
+            
+            // Display scores
+            document.getElementById('overallScore').textContent = `${data.overall_score}%`;
+            document.getElementById('similarityScore').textContent = `${data.similarity_score}%`;
+            document.getElementById('techSkillsScore').textContent = `${data.tech_skills_score}%`;
+            document.getElementById('keywordScore').textContent = `${data.keyword_match_score}%`;
+            document.getElementById('experienceScore').textContent = `${data.experience_score}%`;
+            document.getElementById('educationScore').textContent = `${data.education_score}%`;
+            
+            // Display technical skills
+            const matchingTechSkills = document.getElementById('matchingTechSkills');
+            const missingTechSkills = document.getElementById('missingTechSkills');
+            
+            matchingTechSkills.innerHTML = (data.matching_tech_skills || [])
+                .map(skill => `<span class="bg-green-100 text-green-800 px-2 py-1 rounded">${skill}</span>`)
+                .join('');
+            
+            missingTechSkills.innerHTML = (data.missing_tech_skills || [])
+                .map(skill => `<span class="bg-red-100 text-red-800 px-2 py-1 rounded">${skill}</span>`)
+                .join('');
+            
+            // Display keywords
+            const matchingKeywords = document.getElementById('matchingKeywords');
+            const missingKeywords = document.getElementById('missingKeywords');
+            
+            matchingKeywords.innerHTML = (data.matching_keywords || [])
+                .map(keyword => `<span class="bg-green-100 text-green-800 px-2 py-1 rounded">${keyword}</span>`)
+                .join('');
+            
+            missingKeywords.innerHTML = (data.missing_keywords || [])
+                .map(keyword => `<span class="bg-red-100 text-red-800 px-2 py-1 rounded">${keyword}</span>`)
+                .join('');
+        }
+    </script>
+</body>
+</html>
